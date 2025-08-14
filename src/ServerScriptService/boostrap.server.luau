@@ -6,6 +6,10 @@ local Modules = SSS:WaitForChild("Modules")
 local Spawner = require(Modules:WaitForChild("Spawner"))
 local GlobalTimers = require(Modules:WaitForChild("GlobalTimers"))
 
+game.Players.PlayerAdded:Connect(function(player)
+	player:SetAttribute("BaseNumber", 4)
+end)
+
 Spawner:Start()
 GlobalTimers.configure({
 	legendaryIntervalSeconds = 120,
@@ -13,3 +17,5 @@ GlobalTimers.configure({
 	debug = false,
 })
 GlobalTimers.start()
+
+-- test func remove later

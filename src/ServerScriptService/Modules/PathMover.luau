@@ -10,6 +10,11 @@ export type PathSettings = {
 }
 
 local PathMover = {}
+local tokens: { [Model]: number } = {}
+
+function PathMover.cancel(model: Model)
+	tokens[model] = (tokens[model] or 0) + 1
+end
 
 local function buildPath(agentParams: PathSettings): Path
 	local p = PathfindingService:CreatePath({
@@ -31,10 +36,13 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 	if not humanoid or not hrp or not hrp:IsA("BasePart") then
 		return
 	end
+	local myToken = (tokens[model] or 0) + 1
+	tokens[model] = myToken
 	local function followPath()
 		local try = 0
 		while try < 3 do
 			try += 1
+			if tokens[model] ~= myToken then return end
 			local path = buildPath(agentParams)
 			path:ComputeAsync(hrp.Position, destination)
 			if path.Status ~= Enum.PathStatus.Success then
@@ -42,6 +50,7 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 			else
 				local waypoints = path:GetWaypoints()
 				for i = 1, #waypoints do
+					if tokens[model] ~= myToken then return end
 					local wp = waypoints[i]
 					moveTo(humanoid, wp.Position)
 					local reached = false
@@ -55,22 +64,26 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 					local timeout = math.max(2, math.min(8, (dist / math.max(2, speed)) * 2))
 					local start = os.clock()
 					while not reached and os.clock() - start < timeout do
+						if tokens[model] ~= myToken then return end
 						RunService.Heartbeat:Wait()
 					end
 					if not reached then
 						break
 					end
 					if (hrp.Position - destination).Magnitude <= 6 then
+						if tokens[model] ~= myToken then return end
 						if onArrived then onArrived() end
 						return
 					end
 				end
 				if (hrp.Position - destination).Magnitude <= 8 then
+					if tokens[model] ~= myToken then return end
 					if onArrived then onArrived() end
 					return
 				end
 			end
 		end
+		if tokens[model] ~= myToken then return end
 		moveTo(humanoid, destination)
 	end
 

@@ -1,68 +1,61 @@
 --!strict
-
 local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 
-local GROUP_NPC = "NPCs"
+local CollisionSetup = {}
+local GROUP_NPCS = "NPCs"
 local GROUP_PLAYERS = "Players"
 
-local CollisionSetup = {}
-
-local function ensureGroup(name: string)
-	local ok = true
-	pcall(function()
-		PhysicsService:CreateCollisionGroup(name)
-	end)
-	return ok
+local function groupExists(name: string): boolean
+    for _, info in ipairs(PhysicsService:GetCollisionGroups()) do
+        if info.name == name then
+            return true
+        end
+    end
+    return false
 end
 
-local function safeSet(groupA: string, groupB: string, canCollide: boolean)
-	pcall(function()
-		PhysicsService:CollisionGroupSetCollidable(groupA, groupB, canCollide)
-	end)
+local function ensureGroups()
+    if not groupExists(GROUP_NPCS) then
+        PhysicsService:RegisterCollisionGroup(GROUP_NPCS)
+    end
+    if not groupExists(GROUP_PLAYERS) then
+        PhysicsService:RegisterCollisionGroup(GROUP_PLAYERS)
+    end
+    PhysicsService:CollisionGroupSetCollidable(GROUP_NPCS, GROUP_NPCS, false)
+    PhysicsService:CollisionGroupSetCollidable(GROUP_NPCS, GROUP_PLAYERS, false)
 end
 
-function CollisionSetup.init()
-	ensureGroup(GROUP_NPC)
-	safeSet(GROUP_NPC, GROUP_NPC, false)
-	safeSet(GROUP_NPC, GROUP_PLAYERS, false)
-	safeSet(GROUP_PLAYERS, GROUP_NPC, false)
-
-	Players.PlayerAdded:Connect(function(plr)
-		plr.CharacterAdded:Connect(function(char)
-			for _, d in ipairs(char:GetDescendants()) do
-				if d:IsA("BasePart") then
-					pcall(function()
-						PhysicsService:SetPartCollisionGroup(d, GROUP_PLAYERS)
-					end)
-				end
-			end
-		end)
-	end)
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		local char = plr.Character
-		if char then
-			for _, d in ipairs(char:GetDescendants()) do
-				if d:IsA("BasePart") then
-					pcall(function()
-						PhysicsService:SetPartCollisionGroup(d, GROUP_PLAYERS)
-					end)
-				end
-			end
-		end
-	end
+function CollisionSetup.Init()
+    ensureGroups()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        local char = plr.Character
+        if char then CollisionSetup.ApplyToPlayerCharacter(char) end
+        plr.CharacterAdded:Connect(function(c) CollisionSetup.ApplyToPlayerCharacter(c) end)
+    end
+    Players.PlayerAdded:Connect(function(plr)
+        plr.CharacterAdded:Connect(function(c) CollisionSetup.ApplyToPlayerCharacter(c) end)
+    end)
 end
 
-function CollisionSetup.assign(model: Model)
-	for _, part in ipairs(model:GetDescendants()) do
-		if part:IsA("BasePart") then
-			pcall(function()
-				PhysicsService:SetPartCollisionGroup(part, GROUP_NPC)
-			end)
-			part.Anchored = false
-		end
-	end
+function CollisionSetup.ApplyToNPC(model: Model)
+    ensureGroups()
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") then
+            local p = d :: BasePart
+            p.CollisionGroup = GROUP_NPCS
+            p.Anchored = false
+        end
+    end
+end
+
+function CollisionSetup.ApplyToPlayerCharacter(model: Model)
+    ensureGroups()
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") then
+            (d :: BasePart).CollisionGroup = GROUP_PLAYERS
+        end
+    end
 end
 
 return CollisionSetup

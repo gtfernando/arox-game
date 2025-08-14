@@ -33,13 +33,13 @@ local weights: Weights = {
 }
 
 local settings: Settings = {
-	spawnIntervalSeconds = 10,
+	spawnIntervalSeconds = 6,
 	walkSpeed = 12,
 	pathAgentRadius = 2,
 	pathAgentHeight = 5,
 	arrivalDestroyDistance = 6,
 	useDirectMove = false,
-	desiredGapStuds = 25,
+	desiredGapStuds = nil,
 	debug = false,
 	debugTag = "Spawner",
 }

@@ -19,6 +19,73 @@
       "$properties": {
         "FilteringEnabled": true
       },
+      "Flw": {
+        "$className": "Folder",
+        "Spawn": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Size": [4, 1, 4],
+            "Position": [0, 0, 0],
+            "Color": [0.2, 0.8, 0.2],
+            "Transparency": 0.5
+          }
+        },
+        "Ends": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Size": [4, 1, 4],
+            "Position": [0, 0, 100],
+            "Color": [0.8, 0.2, 0.2],
+            "Transparency": 0.5
+          }
+        }
+      },
+      "LegendaryTimer": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [6, 6, 1],
+          "Position": [10, 5, 0],
+          "Color": [1, 0.84, 0],
+          "Transparency": 0.2
+        },
+        "SurfaceGui": {
+          "$className": "SurfaceGui",
+          "Timer": {
+            "$className": "TextLabel",
+            "$properties": {
+              "Text": "00:00",
+              "TextScaled": true,
+              "Size": [1, 1],
+              "BackgroundTransparency": 1
+            }
+          }
+        }
+      },
+      "MythicTimer": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [6, 6, 1],
+          "Position": [-10, 5, 0],
+          "Color": [0.6, 0.2, 1],
+          "Transparency": 0.2
+        },
+        "SurfaceGui": {
+          "$className": "SurfaceGui",
+          "Timer": {
+            "$className": "TextLabel",
+            "$properties": {
+              "Text": "00:00",
+              "TextScaled": true,
+              "Size": [1, 1],
+              "BackgroundTransparency": 1
+            }
+          }
+        }
+      },
       "Baseplate": {
         "$className": "Part",
         "$properties": {
@@ -60,6 +127,47 @@
       "$path": "src/SoundService",
       "$properties": {
         "RespectFilteringEnabled": true
+      }
+    },
+    "ServerStorage": {
+      "$path": "src/ServerStorage",
+      "Characters": {
+        "$className": "Folder",
+        "DefaultRig": {
+          "$className": "Model",
+          "HumanoidRootPart": {
+            "$className": "Part",
+            "$properties": {
+              "Anchored": true,
+              "Size": [2, 2, 1],
+              "Position": [0, 3, 0],
+              "Transparency": 0.8
+            }
+          }
+        },
+        "Normal": {
+          "$className": "Folder",
+          "Common": {
+            "$className": "Folder",
+            "BlockNPC": {
+              "$className": "Model",
+              "HumanoidRootPart": {
+                "$className": "Part",
+                "$properties": {
+                  "Anchored": false,
+                  "Size": [2, 2, 1],
+                  "Color": [0.2, 0.6, 1.0]
+                }
+              },
+              "Humanoid": {
+                "$className": "Humanoid",
+                "$properties": {
+                  "WalkSpeed": 12
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

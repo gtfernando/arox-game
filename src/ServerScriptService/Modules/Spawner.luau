@@ -82,7 +82,7 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 		return
 	end
 
-	CollisionSetup.assign(model)
+	CollisionSetup.ApplyToNPC(model)
 
 	local container = Workspace:FindFirstChild("NPCs")
 	if not container then
@@ -159,7 +159,7 @@ local Spawner: Handle = {} :: any
 function Spawner:Start()
 	if running then return end
 	running = true
-	CollisionSetup.init()
+	CollisionSetup.Init()
 	
 	local spawnPart, endsPart = findPoints()
 	if not spawnPart or not endsPart then
@@ -208,7 +208,7 @@ function Spawner:SpawnForced(rarity: string)
 		m:Destroy()
 		return
 	end
-	CollisionSetup.assign(m)
+	CollisionSetup.ApplyToNPC(m)
 	m.Parent = container
 	pcall(function() m.PrimaryPart = hrp end)
 	local defaultRig = CharacterSelector.getDefaultRig()
@@ -217,6 +217,29 @@ function Spawner:SpawnForced(rarity: string)
 	m:PivotTo(spawnCF)
 	setNetworkOwnerServer(m)
 	prepareCharacter(m, settings.walkSpeed)
+	local destroyRequested = false
+	local function cleanup()
+		if destroyRequested then return end
+		destroyRequested = true
+		if m and m.Parent then
+			m:Destroy()
+		end
+	end
+	task.spawn(function()
+		local arrival = settings.arrivalDestroyDistance or 6
+		while m.Parent do
+			local root = m:FindFirstChild("HumanoidRootPart")
+			if root and root:IsA("BasePart") then
+				if (root.Position - endsPart.Position).Magnitude <= arrival then
+					cleanup()
+					break
+				end
+			else
+				break
+			end
+			task.wait(0.1)
+		end
+	end)
 	task.spawn(function()
 		if settings.useDirectMove == true then
 			local humanoid = m:FindFirstChildOfClass("Humanoid")
@@ -226,7 +249,7 @@ function Spawner:SpawnForced(rarity: string)
 				agentRadius = settings.pathAgentRadius,
 				agentHeight = settings.pathAgentHeight,
 				walkSpeed = settings.walkSpeed,
-			})
+			}, cleanup)
 		end
 	end)
 end

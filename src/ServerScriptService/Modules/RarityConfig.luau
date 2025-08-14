@@ -25,15 +25,15 @@ export type Settings = {
 local RarityConfig = {}
 
 local weights: Weights = {
-	Common = 60,
+	Common = 70,
 	Rare = 20,
-	Epic = 12,
-	Legendary = 6,
-	Mythic = 2,
+	Epic = 5,
+	Legendary = 4,
+	Mythic = 1,
 }
 
 local settings: Settings = {
-	spawnIntervalSeconds = 6,
+	spawnIntervalSeconds = 3,
 	walkSpeed = 12,
 	pathAgentRadius = 2,
 	pathAgentHeight = 5,

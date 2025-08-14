@@ -1,18 +1,30 @@
 --!strict
 
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
+local ServerScriptService = game:GetService("ServerScriptService")
 
-local RarityConfig = require(script.Parent:WaitForChild("RarityConfig"))
-local CharacterSelector = require(script.Parent:WaitForChild("CharacterSelector"))
-local CollisionSetup = require(script.Parent:WaitForChild("CollisionSetup"))
-local PathMover = require(script.Parent:WaitForChild("PathMover"))
-local Animator = require(script.Parent:WaitForChild("Animator"))
+local Modules = ServerScriptService.Modules
+local RarityConfig = require(Modules:WaitForChild("RarityConfig"))
+local CharacterSelector = require(Modules:WaitForChild("CharacterSelector"))
+local CollisionSetup = require(Modules:WaitForChild("CollisionSetup"))
+local PathMover = require(Modules:WaitForChild("PathMover"))
+local Animator = require(Modules:WaitForChild("Animator"))
+local CharactersPrices = require(Modules:WaitForChild("Config"):WaitForChild("CharConfig"))
+local EventBus = require(Modules.Singleton:WaitForChild("EventBus"))
 
 export type Handle = {
 	Start: (self: Handle) -> (),
 	Stop: (self: Handle) -> (),
 	SpawnForced: (self: Handle, rarity: string) -> (),
+}
+
+type PromptArgs = {
+    name: string,
+    parent: Instance,
+    ActionText: string,
+    ObjectText: string,
+    HoldDuration: number,
+	modelSaved: Model?
 }
 
 local running = false
@@ -39,6 +51,32 @@ local function computeSpawnCFrame(spawnPart: BasePart, defaultRig: Model?): CFra
 	return spawnPart.CFrame + Vector3.new(0, 3, 0)
 end
 
+local function CreateProximityPrompt(opts: PromptArgs): ProximityPrompt
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.Name = opts.name
+    prompt.ActionText = opts.ActionText
+    prompt.ObjectText = opts.ObjectText
+    prompt.HoldDuration = opts.HoldDuration
+    prompt.RequiresLineOfSight = false
+    prompt.MaxActivationDistance = 16
+    prompt.Parent = opts.parent
+    prompt.Enabled = true
+
+	prompt.Triggered:Connect(function(player)
+        EventBus.NPCPrompt:Fire(player, opts.modelSaved)
+    end)
+    return prompt
+end
+
+local function formatNumber(n)
+    local formatted = tostring(math.floor(n))
+    formatted = formatted:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+    if formatted:sub(1, 1) == "," then
+        formatted = formatted:sub(2)
+    end
+    return formatted
+end
+
 local function prepareCharacter(model: Model, walkSpeed: number)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
@@ -50,6 +88,25 @@ local function prepareCharacter(model: Model, walkSpeed: number)
 		end)
 	end
 
+	local parentPart = (model:FindFirstChild("UpperTorso") or model:FindFirstChild("Torso") or hrp) :: BasePart?
+    if parentPart then
+        local attach = parentPart:FindFirstChild("PromptAttachment")
+        if not attach or not attach:IsA("Attachment") then
+            attach = Instance.new("Attachment")
+            attach.Name = "PromptAttachment"
+            attach.Parent = parentPart
+        end
+
+        CreateProximityPrompt({
+			name = model.Name .. "BuyPrompt",
+			parent = model:FindFirstChild("UpperTorso"),
+			ActionText = tostring(formatNumber(CharactersPrices[model.Name].Price)) .. "$",
+			ObjectText = "BUY " .. model.Name,
+			HoldDuration = 1,
+			modelSaved = model
+		})
+    end
+		
 	humanoid:ChangeState(Enum.HumanoidStateType.Running)
 	humanoid.WalkSpeed = walkSpeed
 	humanoid.AutoRotate = true
@@ -217,6 +274,7 @@ function Spawner:SpawnForced(rarity: string)
 	m:PivotTo(spawnCF)
 	setNetworkOwnerServer(m)
 	prepareCharacter(m, settings.walkSpeed)
+
 	local destroyRequested = false
 	local function cleanup()
 		if destroyRequested then return end

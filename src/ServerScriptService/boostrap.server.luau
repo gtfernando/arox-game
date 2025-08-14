@@ -8,8 +8,8 @@ local GlobalTimers = require(Modules:WaitForChild("GlobalTimers"))
 
 Spawner:Start()
 GlobalTimers.configure({
-	legendaryIntervalSeconds = 10,
-	mythicIntervalSeconds = 20,
+	legendaryIntervalSeconds = 120,
+	mythicIntervalSeconds = 200,
 	debug = false,
 })
 GlobalTimers.start()

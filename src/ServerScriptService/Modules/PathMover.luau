@@ -1,5 +1,4 @@
 --!strict
--- PathMover: moves a Humanoid from A to B with PathfindingService
 
 local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
@@ -23,7 +22,6 @@ local function buildPath(agentParams: PathSettings): Path
 end
 
 local function moveTo(humanoid: Humanoid, point: Vector3)
-	-- Use MoveTo for consistent velocity; humanoid will follow
 	humanoid:MoveTo(point)
 end
 
@@ -40,7 +38,6 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 			local path = buildPath(agentParams)
 			path:ComputeAsync(hrp.Position, destination)
 			if path.Status ~= Enum.PathStatus.Success then
-				-- brief yield and retry; then fallback
 				task.wait(0.05)
 			else
 				local waypoints = path:GetWaypoints()
@@ -61,7 +58,6 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 						RunService.Heartbeat:Wait()
 					end
 					if not reached then
-						-- blocked; recompute outer loop
 						break
 					end
 					if (hrp.Position - destination).Magnitude <= 6 then
@@ -69,14 +65,12 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 						return
 					end
 				end
-				-- If close enough to destination, finish
 				if (hrp.Position - destination).Magnitude <= 8 then
 					if onArrived then onArrived() end
 					return
 				end
 			end
 		end
-		-- Fallback: direct move toward destination; let watcher handle cleanup
 		moveTo(humanoid, destination)
 	end
 

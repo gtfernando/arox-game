@@ -1,9 +1,6 @@
 --!strict
--- Spawner: interval-based NPC spawns that path from Workspace.Flw.Spawn to Workspace.Flw.Ends
--- Pure ModuleScript API: Start() / Stop()
 
 local Workspace = game:GetService("Workspace")
-local ServerStorage = game:GetService("ServerStorage")
 local RunService = game:GetService("RunService")
 
 local RarityConfig = require(script.Parent:WaitForChild("RarityConfig"))
@@ -15,11 +12,11 @@ local Animator = require(script.Parent:WaitForChild("Animator"))
 export type Handle = {
 	Start: (self: Handle) -> (),
 	Stop: (self: Handle) -> (),
+	SpawnForced: (self: Handle, rarity: string) -> (),
 }
 
 local running = false
-local loopThread: thread? = nil
--- spacing is controlled by time-based scheduling derived from desiredGapStuds/walkSpeed
+local SpawnQueue = require(script.Parent:WaitForChild("SpawnQueue"))
 
 local function findPoints(): (BasePart?, BasePart?)
 	local flw = Workspace:FindFirstChild("Flw")
@@ -35,7 +32,7 @@ end
 local function computeSpawnCFrame(spawnPart: BasePart, defaultRig: Model?): CFrame
 	local defaultHRP = if defaultRig then defaultRig:FindFirstChild("HumanoidRootPart") else nil
 	if defaultHRP and defaultHRP:IsA("BasePart") then
-		-- Place model matching DefaultRig's offset relative to Spawn
+
 		local offset = spawnPart.CFrame:ToObjectSpace(defaultHRP.CFrame)
 		return spawnPart.CFrame * offset
 	end
@@ -45,14 +42,14 @@ end
 local function prepareCharacter(model: Model, walkSpeed: number)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return end
-	-- Ensure PrimaryPart is HRP for consistent pivot/move
+
 	local hrp = model:FindFirstChild("HumanoidRootPart")
 	if hrp and hrp:IsA("BasePart") then
 		pcall(function()
 			model.PrimaryPart = hrp
 		end)
 	end
-	-- movement tuning
+
 	humanoid:ChangeState(Enum.HumanoidStateType.Running)
 	humanoid.WalkSpeed = walkSpeed
 	humanoid.AutoRotate = true
@@ -79,17 +76,14 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 	if not model then return end
 	model.Name = model.Name -- keep original name for AnimationOverrides key
 	
-	-- Ensure HRP exists
 	local hrp = model:FindFirstChild("HumanoidRootPart")
 	if not hrp or not hrp:IsA("BasePart") then
 		model:Destroy()
 		return
 	end
 
-	-- Collision + physics setup first
 	CollisionSetup.assign(model)
 
-	-- Parent to Workspace under a dedicated folder for clarity
 	local container = Workspace:FindFirstChild("NPCs")
 	if not container then
 		container = Instance.new("Folder")
@@ -98,20 +92,20 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 	end
 	model.Parent = container
 
-	-- Position at spawn using DefaultRig offset if available
+	pcall(function()
+		model.PrimaryPart = hrp
+	end)
+
 	local defaultRig = CharacterSelector.getDefaultRig()
 	local spawnCF = computeSpawnCFrame(spawnPart, defaultRig)
-	-- Face toward the destination for immediate forward motion
+
 	spawnCF = CFrame.new(spawnCF.Position, endsPart.Position)
 	model:PivotTo(spawnCF)
 
-	-- Server owns physics for stability
 	setNetworkOwnerServer(model)
 
-	-- Walk settings and animations
 	prepareCharacter(model, settings.walkSpeed)
 
-	-- Start path move; cleanup on arrival
 	local destroyRequested = false
 	local function cleanup()
 		if destroyRequested then return end
@@ -121,7 +115,6 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 		end
 	end
 
-	-- Also guard with distance check in case of direct move fallback
 	task.spawn(function()
 		local arrival = settings.arrivalDestroyDistance or 6
 		while model.Parent do
@@ -144,7 +137,6 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 			local humanoid = model:FindFirstChildOfClass("Humanoid")
 			if humanoid then
 				humanoid:MoveTo(endsPart.Position)
-				-- Cleanup handled by distance watcher to avoid mid-path despawn
 			else
 				cleanup()
 			end
@@ -157,7 +149,6 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 		end
 	end)
 
-	-- No per-NPC spacing tracking; cadence is time-driven
 	if settings.debug then
 		print(string.format("[%s] Spawned %s in %.3fs", settings.debugTag or "Spawner", model.Name, os.clock() - t0))
 	end
@@ -177,37 +168,67 @@ function Spawner:Start()
 	end
 	
 	local settings = RarityConfig.getSettings()
-	loopThread = task.spawn(function()
-		local interval = settings.spawnIntervalSeconds
-		if settings.desiredGapStuds and settings.walkSpeed > 0 then
-			interval = settings.desiredGapStuds / settings.walkSpeed
-		end
-		interval = math.max(0.05, interval)
-		local nextAt = os.clock()
-		-- strict time-based cadence; spacing emerges from desiredGapStuds/walkSpeed
-		while running do
-			local now = os.clock()
-			if now >= nextAt then
-				task.defer(spawnOne, spawnPart :: BasePart, endsPart :: BasePart)
-				if settings.debug then
-					local lag = now - nextAt
-					if math.abs(lag) > 0.02 then
-						print(string.format("[%s] drift=%.3fs", settings.debugTag or "Spawner", lag))
-					end
-				end
-				nextAt = now + interval
+	SpawnQueue.start({
+		getIntervalSeconds = function()
+			if settings.desiredGapStuds and settings.walkSpeed > 0 then
+				return settings.desiredGapStuds / settings.walkSpeed
 			end
-			RunService.Heartbeat:Wait()
-		end
-	end)
+			return settings.spawnIntervalSeconds
+		end,
+		spawnWeighted = function()
+			spawnOne(spawnPart :: BasePart, endsPart :: BasePart)
+		end,
+		spawnForced = function(r)
+			self:SpawnForced(r :: any)
+		end,
+		debug = settings.debug,
+		debugTag = settings.debugTag,
+	})
 end
 
 function Spawner:Stop()
 	running = false
-	if loopThread then
-		-- Let it exit naturally on next tick
-		loopThread = nil
+	SpawnQueue.stop()
+end
+
+function Spawner:SpawnForced(rarity: string)
+	local spawnPart, endsPart = findPoints()
+	if not spawnPart or not endsPart then return end
+	local m = CharacterSelector.pickFromRarity(rarity :: any)
+	if not m then return end
+	local settings = RarityConfig.getSettings()
+	local container = Workspace:FindFirstChild("NPCs")
+	if not container then
+		container = Instance.new("Folder")
+		container.Name = "NPCs"
+		container.Parent = Workspace
 	end
+	local hrp = m:FindFirstChild("HumanoidRootPart")
+	if not hrp or not hrp:IsA("BasePart") then
+		m:Destroy()
+		return
+	end
+	CollisionSetup.assign(m)
+	m.Parent = container
+	pcall(function() m.PrimaryPart = hrp end)
+	local defaultRig = CharacterSelector.getDefaultRig()
+	local spawnCF = computeSpawnCFrame(spawnPart, defaultRig)
+	spawnCF = CFrame.new(spawnCF.Position, endsPart.Position)
+	m:PivotTo(spawnCF)
+	setNetworkOwnerServer(m)
+	prepareCharacter(m, settings.walkSpeed)
+	task.spawn(function()
+		if settings.useDirectMove == true then
+			local humanoid = m:FindFirstChildOfClass("Humanoid")
+			if humanoid then humanoid:MoveTo(endsPart.Position) end
+		else
+			PathMover.go(m, endsPart.Position, {
+				agentRadius = settings.pathAgentRadius,
+				agentHeight = settings.pathAgentHeight,
+				walkSpeed = settings.walkSpeed,
+			})
+		end
+	end)
 end
 
 return Spawner

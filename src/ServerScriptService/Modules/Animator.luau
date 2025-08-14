@@ -1,6 +1,4 @@
 --!strict
--- Animator: loads walk + idle animations (with per-NPC overrides)
-
 local AnimationOverrides = require(script.Parent:WaitForChild("AnimationOverrides"))
 
 local Animator = {}
@@ -11,7 +9,6 @@ local function loadAnim(humanoid: Humanoid, animId: number): AnimationTrack?
 	local anim = Instance.new("Animation")
 	anim.AnimationId = "rbxassetid://" .. tostring(animId)
 	local track = animator:LoadAnimation(anim)
-	-- Priority is set by caller (walk vs idle)
 	return track
 end
 

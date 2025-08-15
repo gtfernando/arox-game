@@ -45,14 +45,17 @@ local function moveModelToPlaceholder(model: Model, target: BasePart)
     end)
     humanoid:ChangeState(Enum.HumanoidStateType.Running)
     local destroyed = false
+    
     local function cleanup()
         if destroyed then return end
         destroyed = true
         if model and model.Parent then
+            print(model.Name .. " has reached its destination, cleaning up.")
             PathMover.cancel(model)
             SafeDestroy.destroy(model)
         end
     end
+
     task.spawn(function()
         local arrival = settings.arrivalDestroyDistance or 6
         while model.Parent do

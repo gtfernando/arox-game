@@ -43,9 +43,12 @@ local basePrompts: {[string]: ProximityPrompt} = {}
 
 local baseTimers: {[string]: { version: number, lastTouch: number? }} = {}
 local baseTouchConn: {[string]: RBXScriptConnection} = {}
+local baseFriendsAllowed: {[string]: boolean} = {}
+local baseUnlocked: {[string]: boolean} = {} -- true when globally unlocked
 
 local function BroadcastDoorState(baseID: string, isUnlocked: boolean, cooldownSeconds: number?)
     --print(string.format("[BaseSelector] BroadcastDoorState | base=%s | unlocked=%s | cooldown=%s", baseID, tostring(isUnlocked), tostring(cooldownSeconds)))
+    baseUnlocked[baseID] = isUnlocked
     ReplicatedStorage.Base.UnLockDoors:FireAllClients({
         baseId = baseID,
         lock = isUnlocked,
@@ -72,6 +75,12 @@ local function OnPromptTriggered(triggerPlayer: Player, baseID: string)
     local owner = FreeBases[baseID].OwnedBy :: Player
     if not owner then
         print("La base no tiene dueño.")
+        return
+    end
+
+    -- Only base owner can toggle friends access
+    if triggerPlayer ~= owner then
+        warn(string.format("[BaseSelector] %s intentó cambiar amigos en base %s sin ser dueño", triggerPlayer.Name, baseID))
         return
     end
 
@@ -112,17 +121,19 @@ local function OnPromptTriggered(triggerPlayer: Player, baseID: string)
         end
     end
 
-    if #friendsOnline > 0 then
-        print("Amigos conectados de " .. owner.Name .. ": " .. table.concat(
-            table.map(friendsOnline, function(p) return p.Name end), ", "
-        ))
+    -- Persist friend-allowed state for this base: when isLocked == false => friends allowed
+    local allowFriends = (isLocked == false)
+    baseFriendsAllowed[baseID] = allowFriends
 
+    if #friendsOnline > 0 then
+        --print("Amigos conectados de " .. owner.Name .. ": " .. table.concat(
+        --    table.map(friendsOnline, function(p) return p.Name end), ", "
+        --))
         for _, friend in ipairs(friendsOnline) do
-            --print(string.format("[BaseSelector] Friend toggle | base=%s | friend=%s | friendsAllowed=%s", baseID, friend.Name, tostring(not isLocked)))
             ReplicatedStorage.Base.UnLockDoors:FireClient(friend, {
                 baseId = baseID,
-                lock = isLocked, 
-                friendAllowed = not isLocked,
+                lock = isLocked,
+                friendAllowed = allowFriends,
                 global = false,
             })
         end
@@ -151,12 +162,34 @@ local function SetOwnerBase(player: Player, baseID: string)
     local num = tonumber(baseID)
     if num then
         player:SetAttribute("BaseNumber", num)
+        print("ASAD")
     else
+        print("SADSA")
         player:SetAttribute("BaseNumber", baseID)
     end
 
+    baseFriendsAllowed[baseID] = false
+    baseUnlocked[baseID] = false
     BroadcastDoorState(baseID, false, BaseLockConfig.InitialCooldownSeconds)
     ScheduleUnlock(baseID, BaseLockConfig.InitialCooldownSeconds)
+
+    ReplicatedStorage.Base.UnLockDoors:FireClient(player, {
+        baseId = baseID,
+        lock = false,
+        friendAllowed = true,
+        global = false,
+    })
+
+    task.delay(1, function()
+        if player and player.Parent == Players then
+            ReplicatedStorage.Base.UnLockDoors:FireClient(player, {
+                baseId = baseID,
+                lock = false,
+                friendAllowed = true,
+                global = false,
+            })
+        end
+    end)
 
     local lockPart = Base:FindFirstChild("Lock")
     if lockPart and lockPart:IsA("BasePart") then
@@ -181,6 +214,35 @@ local function SetOwnerBase(player: Player, baseID: string)
             --print(string.format("[BaseSelector] Owner re-lock | base=%s | owner=%s | rebirths=%d | cooldown=%ds", baseID, player.Name, rebirths, waitSeconds))
 
             BroadcastDoorState(baseID, false, waitSeconds)
+            -- If friends are allowed for this base, re-open for friends right away
+            if baseFriendsAllowed[baseID] == true then
+                local friendsOnline: {Player} = {}
+                for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                    if otherPlayer ~= player then
+                        local success, result = pcall(function()
+                            return player:IsFriendsWith(otherPlayer.UserId)
+                        end)
+                        if success and result then
+                            table.insert(friendsOnline, otherPlayer)
+                        end
+                    end
+                end
+                for _, friend in ipairs(friendsOnline) do
+                    ReplicatedStorage.Base.UnLockDoors:FireClient(friend, {
+                        baseId = baseID,
+                        lock = false,
+                        friendAllowed = true,
+                        global = false,
+                    })
+                end
+            end
+            -- Always ensure owner can pass after re-lock
+            ReplicatedStorage.Base.UnLockDoors:FireClient(player, {
+                baseId = baseID,
+                lock = false,
+                friendAllowed = true,
+                global = false,
+            })
             ScheduleUnlock(baseID, waitSeconds)
         end)
     end
@@ -195,7 +257,6 @@ local function TeleportPlayerToBase(player: Player, baseID: string)
         local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
         if hrp then
             hrp.CFrame = placeholder.CFrame + Vector3.new(0, 5, 0)
-            SetOwnerBase(player, baseID)
         end
     else
         warn("No se encontró el placeholder para la base " .. baseID)
@@ -219,13 +280,17 @@ local function AssignBaseToPlayer(player: Player)
 
     print(player.Name .. " ha tomado la base " .. baseID)
 
-    TeleportPlayerToBase(player, baseID)
+    SetOwnerBase(player, baseID)
 end
 
 
 local function FreePlayerBase(player: Player)
     local baseID = playerToBase[player]
     if baseID then
+        local Base = Workspace.Bases:FindFirstChild("Base" .. baseID) :: Model
+        local Sign = Base["Base_" .. baseID].Sign :: BasePart
+        Sign.SurfaceGui.TextLabel.Text = "Label"
+
         FreeBases[baseID].OwnedBy = nil
         table.insert(freeBaseIDs, baseID)
         playerToBase[player] = nil
@@ -238,14 +303,50 @@ local function FreePlayerBase(player: Player)
             baseTouchConn[baseID]:Disconnect()
             baseTouchConn[baseID] = nil
         end
+    baseFriendsAllowed[baseID] = nil
+    baseUnlocked[baseID] = nil
         BroadcastDoorState(baseID, false)
     end
 end
 
 Players.PlayerAdded:Connect(function(player)
+    AssignBaseToPlayer(player)
+
     player.CharacterAdded:Connect(function()
-        AssignBaseToPlayer(player)
+        local baseID = playerToBase[player]
+        if baseID then
+            TeleportPlayerToBase(player, baseID)
+            -- After teleport, if the base is still globally locked, ensure owner access again
+            if baseUnlocked[baseID] == false then
+                ReplicatedStorage.Base.UnLockDoors:FireClient(player, {
+                    baseId = baseID,
+                    lock = false,
+                    friendAllowed = true,
+                    global = false,
+                })
+            end
+        end
     end)
+
+    -- If any base is locked and allows friends, grant access to joining friends
+    for baseID, allow in pairs(baseFriendsAllowed) do
+        if allow == true then
+            local owner = FreeBases[baseID].OwnedBy
+            if owner and owner ~= player and baseUnlocked[baseID] == false then
+                local ok, isFriend = pcall(function()
+                    return owner:IsFriendsWith(player.UserId)
+                end)
+                if ok and isFriend then
+                    ReplicatedStorage.Base.UnLockDoors:FireClient(player, {
+                        baseId = baseID,
+                        lock = false,
+                        friendAllowed = true,
+                        global = false,
+                    })
+                end
+            end
+        end
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)

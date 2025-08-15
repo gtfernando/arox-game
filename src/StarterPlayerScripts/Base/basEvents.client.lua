@@ -74,7 +74,7 @@ Base.UnLockDoors.OnClientEvent:Connect(function(data: {baseId: string, lock: boo
         end
     end
     if isOwner then
-        print("[BaseClient] Owner detected for base " .. tostring(data.baseId))
+        --print("[BaseClient] Owner detected for base " .. tostring(data.baseId))
     end
     local function setHitboxCollide(part: Instance?, collide: boolean)
         if part and part:IsA("BasePart") then

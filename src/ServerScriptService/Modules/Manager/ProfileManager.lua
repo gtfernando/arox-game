@@ -1,4 +1,6 @@
 local ServerScriptService = game:GetService("ServerScriptService")
+local HttpService = game:GetService("HttpService")
+
 local ProfileStore = require(ServerScriptService.Modules.Manager.ProfileStore)
 
 local PROFILE_TEMPLATE = {
@@ -11,6 +13,28 @@ local Players = game:GetService("Players")
 
 local PlayerStore = ProfileStore.New("testStore", PROFILE_TEMPLATE)
 local Profiles: {[Player]: typeof(PlayerStore:StartSessionAsync())} = {}
+
+local function CreateNPCKey(name: string)
+    local cleanName = string.lower(name)
+    cleanName = string.gsub(cleanName, "%s+", "_")
+    return cleanName .. "-" .. HttpService:GenerateGUID(false)
+end
+
+local function SaveNPCData(player: Player, name: string, slot_id: string, rarity: string)
+    local profile = Profiles[player]
+    if not profile or not profile.Data then
+        warn("No profile loaded for player:", player.Name)
+        return
+    end
+
+    profile.Data.Items = profile.Data.Items or {}
+
+    profile.Data.Items[CreateNPCKey(name)] = {
+        Rarity = rarity,
+        SlotId = slot_id
+    }
+end
+
 
 local function PlayerAdded(player)
 

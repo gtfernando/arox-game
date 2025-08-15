@@ -45,7 +45,7 @@ local baseTimers: {[string]: { version: number, lastTouch: number? }} = {}
 local baseTouchConn: {[string]: RBXScriptConnection} = {}
 
 local function BroadcastDoorState(baseID: string, isUnlocked: boolean, cooldownSeconds: number?)
-    print(string.format("[BaseSelector] BroadcastDoorState | base=%s | unlocked=%s | cooldown=%s", baseID, tostring(isUnlocked), tostring(cooldownSeconds)))
+    --print(string.format("[BaseSelector] BroadcastDoorState | base=%s | unlocked=%s | cooldown=%s", baseID, tostring(isUnlocked), tostring(cooldownSeconds)))
     ReplicatedStorage.Base.UnLockDoors:FireAllClients({
         baseId = baseID,
         lock = isUnlocked,
@@ -58,7 +58,7 @@ local function ScheduleUnlock(baseID: string, seconds: number)
     if baseTimers[baseID] == nil then baseTimers[baseID] = { version = 0 } end
     baseTimers[baseID].version += 1
     local myVersion = baseTimers[baseID].version
-    print(string.format("[BaseSelector] ScheduleUnlock | base=%s | in=%ds | version=%d", baseID, seconds, myVersion))
+    --print(string.format("[BaseSelector] ScheduleUnlock | base=%s | in=%ds | version=%d", baseID, seconds, myVersion))
     task.delay(seconds, function()
         local t = baseTimers[baseID]
         if t and t.version == myVersion then
@@ -118,7 +118,7 @@ local function OnPromptTriggered(triggerPlayer: Player, baseID: string)
         ))
 
         for _, friend in ipairs(friendsOnline) do
-            print(string.format("[BaseSelector] Friend toggle | base=%s | friend=%s | friendsAllowed=%s", baseID, friend.Name, tostring(not isLocked)))
+            --print(string.format("[BaseSelector] Friend toggle | base=%s | friend=%s | friendsAllowed=%s", baseID, friend.Name, tostring(not isLocked)))
             ReplicatedStorage.Base.UnLockDoors:FireClient(friend, {
                 baseId = baseID,
                 lock = isLocked, 
@@ -178,7 +178,7 @@ local function SetOwnerBase(player: Player, baseID: string)
                 rebirths = profile.Data.Rebirths
             end
             local waitSeconds = BaseLockConfig.getRelockCooldownSeconds(rebirths)
-            print(string.format("[BaseSelector] Owner re-lock | base=%s | owner=%s | rebirths=%d | cooldown=%ds", baseID, player.Name, rebirths, waitSeconds))
+            --print(string.format("[BaseSelector] Owner re-lock | base=%s | owner=%s | rebirths=%d | cooldown=%ds", baseID, player.Name, rebirths, waitSeconds))
 
             BroadcastDoorState(baseID, false, waitSeconds)
             ScheduleUnlock(baseID, waitSeconds)
@@ -208,7 +208,10 @@ local function AssignBaseToPlayer(player: Player)
         return
     end
 
-    local baseID = freeBaseIDs[#freeBaseIDs]
+    local index = math.random(1, #freeBaseIDs)
+    local baseID = freeBaseIDs[index]
+
+    freeBaseIDs[index] = freeBaseIDs[#freeBaseIDs]
     freeBaseIDs[#freeBaseIDs] = nil
 
     FreeBases[baseID].OwnedBy = player
@@ -219,17 +222,17 @@ local function AssignBaseToPlayer(player: Player)
     TeleportPlayerToBase(player, baseID)
 end
 
+
 local function FreePlayerBase(player: Player)
     local baseID = playerToBase[player]
     if baseID then
         FreeBases[baseID].OwnedBy = nil
-        table.insert(freeBaseIDs, baseID) -- push O(1)
+        table.insert(freeBaseIDs, baseID)
         playerToBase[player] = nil
         print("La base " .. baseID .. " ahora está libre")
 
-        -- Cleanup timers / touch connections, and ensure doors are locked/closed
         if baseTimers[baseID] then
-            baseTimers[baseID].version += 1 -- cancel pending
+            baseTimers[baseID].version += 1 
         end
         if baseTouchConn[baseID] then
             baseTouchConn[baseID]:Disconnect()

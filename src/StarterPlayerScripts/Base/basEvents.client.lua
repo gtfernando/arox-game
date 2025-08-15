@@ -42,7 +42,7 @@ local function startCountdown(baseId: string, uiTimer: TextLabel, seconds: numbe
 end
 
 Base.UnLockDoors.OnClientEvent:Connect(function(data: {baseId: string, lock: boolean, global: boolean?, cooldown: number?})
-    print(string.format("[BaseClient] Event | base=%s | global=%s | lock=%s | cooldown=%s", tostring(data.baseId), tostring(data.global ~= false), tostring(data.lock), tostring(data.cooldown)))
+    --print(string.format("[BaseClient] Event | base=%s | global=%s | lock=%s | cooldown=%s", tostring(data.baseId), tostring(data.global ~= false), tostring(data.lock), tostring(data.cooldown)))
     local BaseModel = Workspace.Bases:FindFirstChild("Base" .. data.baseId) :: Model
     if not BaseModel then return end
     local Floors = BaseModel:FindFirstChild("Floors") :: Folder
@@ -79,7 +79,7 @@ Base.UnLockDoors.OnClientEvent:Connect(function(data: {baseId: string, lock: boo
     local function setHitboxCollide(part: Instance?, collide: boolean)
         if part and part:IsA("BasePart") then
             part.CanCollide = collide
-            print(string.format("[BaseClient] Hitbox=%s | CanCollide=%s", part:GetFullName(), tostring(collide)))
+            --print(string.format("[BaseClient] Hitbox=%s | CanCollide=%s", part:GetFullName(), tostring(collide)))
         end
     end
     if data.global ~= false then

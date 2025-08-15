@@ -1,7 +1,10 @@
 --!strict
 local Workspace = game:GetService("Workspace")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Modules = ServerScriptService:WaitForChild("Modules")
+local Transmission = ReplicatedStorage:WaitForChild("Transmission")
 
 type CharEntry = { Price: number }
 local CharConfig = require(Modules.Config.CharConfig) :: { [string]: CharEntry }
@@ -86,7 +89,12 @@ EventBus.NPCPrompt:Connect(function(player: Player, model: Model?)
     if data.Dinero >= cfg.Price then
         data.Dinero -= cfg.Price
 
-        print("moving")
+        Transmission.HideProximityPrompts:FireAllClients({
+            model = model,
+            user = player,
+            proximity = model:FindFirstChild("UpperTorso"):FindFirstChild(model.Name .. "BuyPrompt")
+        })
+
         local target = getPlaceholderForPlayer(player)
         if target then
             PathMover.cancel(model)

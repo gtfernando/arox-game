@@ -6,8 +6,9 @@ local Modules = SSS:WaitForChild("Modules")
 local Spawner = require(Modules:WaitForChild("Spawner"))
 local GlobalTimers = require(Modules:WaitForChild("GlobalTimers"))
 
+-- TODO remove this later, just for test NOTE: (BaseNumber -> IMPORTANT ATTRIBUTE ON PLAYER)
 game.Players.PlayerAdded:Connect(function(player)
-	player:SetAttribute("BaseNumber", 4)
+	player:SetAttribute("BaseNumber", math.random(1, 8))
 end)
 
 Spawner:Start()
@@ -17,5 +18,3 @@ GlobalTimers.configure({
 	debug = false,
 })
 GlobalTimers.start()
-
--- test func remove later

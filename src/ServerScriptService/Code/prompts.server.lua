@@ -17,6 +17,7 @@ type PromptSignal = { Connect: (self: any, handler: (player: Player, model: Mode
 local EventBus = require(Modules.Singleton.EventBus) :: { NPCPrompt: PromptSignal }
 local PathMover = require(Modules:WaitForChild("PathMover"))
 local RarityConfig = require(Modules:WaitForChild("RarityConfig"))
+local SafeDestroy = require(Modules:WaitForChild("SafeDestroy"))
 
 local function getPlaceholderForPlayer(player: Player): BasePart?
     local baseAttr = player:GetAttribute("BaseNumber")
@@ -48,7 +49,8 @@ local function moveModelToPlaceholder(model: Model, target: BasePart)
         if destroyed then return end
         destroyed = true
         if model and model.Parent then
-            model:Destroy()
+            PathMover.cancel(model)
+            SafeDestroy.destroy(model)
         end
     end
     task.spawn(function()
@@ -87,18 +89,17 @@ EventBus.NPCPrompt:Connect(function(player: Player, model: Model?)
     if not data then return end
 
     if data.Dinero >= cfg.Price then
-        data.Dinero -= cfg.Price
-
-        Transmission.HideProximityPrompts:FireAllClients({
-            model = model,
-            user = player,
-            proximity = model:FindFirstChild("UpperTorso"):FindFirstChild(model.Name .. "BuyPrompt")
-        })
-
         local target = getPlaceholderForPlayer(player)
         if target then
+            data.Dinero -= cfg.Price
+
+            Transmission.HideProximityPrompts:FireAllClients({
+                model = model,
+                user = player,
+                proximity = model:FindFirstChild("UpperTorso"):FindFirstChild(model.Name .. "BuyPrompt")
+            })
             PathMover.cancel(model)
-            task.wait() -- give a frame for previous path to stop
+            task.wait() 
             moveModelToPlaceholder(model, target)
         else
             warn("[Prompts] No placeholder found for BaseNumber, skipping move")

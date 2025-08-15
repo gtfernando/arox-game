@@ -54,20 +54,27 @@ function PathMover.go(model: Model, destination: Vector3, agentParams: PathSetti
 					local wp = waypoints[i]
 					moveTo(humanoid, wp.Position)
 					local reached = false
-					local conn
-					conn = humanoid.MoveToFinished:Connect(function(ok)
+					local conn: RBXScriptConnection? = nil
+					conn = humanoid.MoveToFinished:Connect(function(_)
 						reached = true
 						if conn then conn:Disconnect() end
+						conn = nil
 					end)
 					local dist = (hrp.Position - wp.Position).Magnitude
 					local speed = agentParams.walkSpeed or humanoid.WalkSpeed
 					local timeout = math.max(2, math.min(8, (dist / math.max(2, speed)) * 2))
 					local start = os.clock()
 					while not reached and os.clock() - start < timeout do
-						if tokens[model] ~= myToken then return end
+						if tokens[model] ~= myToken then
+							if conn then conn:Disconnect() end
+							conn = nil
+							return
+						end
 						RunService.Heartbeat:Wait()
 					end
 					if not reached then
+						if conn then conn:Disconnect() end
+						conn = nil
 						break
 					end
 					if (hrp.Position - destination).Magnitude <= 6 then

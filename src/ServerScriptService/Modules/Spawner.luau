@@ -11,6 +11,7 @@ local PathMover = require(Modules:WaitForChild("PathMover"))
 local Animator = require(Modules:WaitForChild("Animator"))
 local CharactersPrices = require(Modules:WaitForChild("Config"):WaitForChild("CharConfig"))
 local EventBus = require(Modules.Singleton:WaitForChild("EventBus"))
+local SafeDestroy = require(Modules:WaitForChild("SafeDestroy"))
 
 export type Handle = {
 	Start: (self: Handle) -> (),
@@ -135,7 +136,7 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 	
 	local hrp = model:FindFirstChild("HumanoidRootPart")
 	if not hrp or not hrp:IsA("BasePart") then
-		model:Destroy()
+		SafeDestroy.destroy(model)
 		return
 	end
 
@@ -168,7 +169,8 @@ local function spawnOne(spawnPart: BasePart, endsPart: BasePart)
 		if destroyRequested then return end
 		destroyRequested = true
 		if model and model.Parent then
-			model:Destroy()
+			PathMover.cancel(model)
+			SafeDestroy.destroy(model)
 		end
 	end
 
@@ -262,7 +264,7 @@ function Spawner:SpawnForced(rarity: string)
 	end
 	local hrp = m:FindFirstChild("HumanoidRootPart")
 	if not hrp or not hrp:IsA("BasePart") then
-		m:Destroy()
+		SafeDestroy.destroy(m)
 		return
 	end
 	CollisionSetup.ApplyToNPC(m)
@@ -280,7 +282,8 @@ function Spawner:SpawnForced(rarity: string)
 		if destroyRequested then return end
 		destroyRequested = true
 		if m and m.Parent then
-			m:Destroy()
+			PathMover.cancel(m)
+			SafeDestroy.destroy(m)
 		end
 	end
 	task.spawn(function()

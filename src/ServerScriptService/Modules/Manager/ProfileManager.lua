@@ -4,6 +4,7 @@ local ProfileStore = require(ServerScriptService.Modules.Manager.ProfileStore)
 local PROFILE_TEMPLATE = {
    Dinero = 10000000,
    Items = {},
+   Rebirths = 0
 }
 
 local Players = game:GetService("Players")
